@@ -1,0 +1,5 @@
+Read and understand mpos-app.c
+Read and understand mpos-app.h
+Read and understand mpos-kern.h
+Read and understand mpos-kern.c
+Undertsand interrupt() in mpos-kern.c and read and understand sys_getpid interacts with INT_SYS_GETPID 

@@ -1,0 +1,19 @@
+Name: Ajan Jayant
+UCLA ID: 904039631
+
+Collaborators: Droan Rishi
+	       603810834
+-------------------------------------------------------------------------------
+
+Response to Exercise 1:
+In most cases, if we replace run(current) found in mpos-x86.c with schedule, implemented in mpos-kern.c. When a process is interrupted by a system call, control flow is transferred to the kernel. The kernel creates its own stack, and puts the return value in the process' %eax register. If schedule is run, this results in another process being executed. This process creates its own stack. Thus, when control eventually is returned to the original process, the right value is popped of the stack.
+However, weensyos1 does not have complete process isolation. So some processes could overwrite each others' local variables, thus distorting the stack.
+
+
+Anything else you'd like us to know:
+#3
+An extra field, wait_pid was added 
+
+
+Extra credit exercises:
+#6 and  #7 implemented only
