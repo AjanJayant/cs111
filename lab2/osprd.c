@@ -34,7 +34,7 @@
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DESCRIPTION("CS 111 RAM Disk");
 // EXERCISE: Pass your names into the kernel as the module's authors.
-MODULE_AUTHOR("Skeletor");
+MODULE_AUTHOR("Ajan Jayant and Rishi Droan");
 
 #define OSPRD_MAJOR	222
 
@@ -121,9 +121,48 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
 	// 'req->buffer' members, and the rq_data_dir() function.
 
 	// Your code here.
-	eprintk("Should process request...\n");
+	
+	// Variables to store request offset, avail_size declared and
+	// initialised
+	
+	unsigned int avail_bytes;
+	unsigned int request_offset;
 
-	end_request(req, 1);
+	request_offset = req->sector*SECTOR_SIZE;
+	avail_bytes = req->current_nr_sectors*SECTOR_SIZE;
+
+	// Make sure buffer isn't overrun
+        if( (request_offset = avail_bytes) > nsectors*SECTOR_SIZE)
+        {
+                eprintk("Buffer overrun\n");
+                end_request(req, 0);
+        }
+
+        // Read from the RAMDISK
+        // Copy the data in the requested sectors into the buffer
+        if (rq_data_dir(req) == READ)
+	{
+		memcpy(req->buffer, d->data+request_offset, avail_bytes);
+	}
+	// Write to the RAMDISK
+        // Copy the data in the requested sectors from the buffer
+	else if(rq_data_dir(req) == WRITE)
+	{
+                memcpy(d->data+request_offset, req->buffer, avail_bytes);
+	}
+	// Otherwise, invalid request
+	else
+	{
+		eprintk("Invalid request\n");
+		end_request(req, 0);
+	}
+		
+        end_request(req, 1);
+
+
+	//eprintk("Should process request...\n");
+
+	//end_request(req, 1);
 }
 
 
