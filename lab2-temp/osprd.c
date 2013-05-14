@@ -301,12 +301,9 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 {
 	osprd_info_t *d = file2osprd(filp);	// device info
 
-	if(d == NULL)
-	{
-		return -1;
-	}
-
 	int r = 0;			// return value: initially 0
+
+	int index, open;
 
 	// is file open for writing?
 	int filp_writable = (filp->f_mode & FMODE_WRITE) != 0;
@@ -316,7 +313,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 	// Set 'r' to the ioctl's return value: 0 on success, negative on error
 
-	int index, open;
 
 	if ( (cmd == OSPRDIOCACQUIRE) || (cmd == OSPRDIOCTRYACQUIRE)) 
 	{
@@ -358,31 +354,29 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 		// Your code here (instead of the next two lines).
 
-		while(1)
-		{
+		if(d == NULL)
+        	{
+                	return -1;
+        	}
+
+
+		while(1){
 			// Acquire lock
 			osp_spin_lock(&d->mutex);
 
-			// If file is open for writing then acquire write lock
-			if(filp_writable)
-			{
-				// Check to see if there are no locks. 
-				// If not, then we acquire write lock.
-				if((d->read_locks == 0) && (d->write_lock == 0))
-				{
+			if(filp_writable){
+				// Make sure there are no locks. 
+				if((d->read_locks == 0) && (d->write_lock == 0)){
 					d->write_lock_owner = current->pid;
 					
-					// Set flag to locked
 					filp->f_flags |= F_OSPRD_LOCKED;
 
 					// Write lock acquired and indicated
 					d->write_lock++;
 
 					index = 0;
-					while(index < MAX_LOCKS)
-					{
-						if(d->write_wait[index] == current->pid)
-						{ 
+					while(index < MAX_LOCKS){
+						if(d->write_wait[index] == current->pid){ 
 							d->write_wait[index] = 0;
 							break; 
 						}
@@ -394,21 +388,17 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 					break;
 				}
 				// Write lock was not acquired
-				else if(cmd == OSPRDIOCACQUIRE)
-				{
+				else if(cmd == OSPRDIOCACQUIRE){
 					index = 0;
 					open = -1;
 
-					while(index < MAX_LOCKS)
-					{
-						if((d->write_wait[index] == 0) && (open == -1))
-						{
+					while(index < MAX_LOCKS){
+						if((d->write_wait[index] == 0) && (open == -1)){
 							open = index;
 						}
 
 						// Check to see if process is already in write_wait array
-						if(d->write_wait[index] == current->pid)
-						{
+						if(d->write_wait[index] == current->pid){
 							index = -1; 
 							break; 
 						}
@@ -421,17 +411,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				}
 			}
 			// Acquire read lock
-			else
-			{
-				if(d->write_lock == 0)
-				{
+			else{
+				if(d->write_lock == 0){
 					index = 0;
 
-					// Add lock to read_hole array
-					while(index < MAX_LOCKS)
-					{
-						if(d->read_hold[index] == 0)
-						{
+					// Add lock to array
+					while(index < MAX_LOCKS){
+						if(d->read_hold[index] == 0){
 							d->read_hold[index] = current->pid;
 							break;
 						}
@@ -445,10 +431,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 					index = 0;
 				
 					// Remove process from read_wait array - READ lock acquired
-					while(index < MAX_LOCKS) 
-					{
-						if(d->read_wait[index] == current->pid)
-						{ 
+					while(index < MAX_LOCKS) {
+						if(d->read_wait[index] == current->pid){ 
 							d->read_wait[index] = 0;
 							break; 
 						}
@@ -460,39 +444,33 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				}
 				// Could not acquire READ lock
 				else if(cmd == OSPRDIOCACQUIRE)
-				{
+{
 					index = 0;
 					open = -1;
 
 					// Add process to read_wait array since lock wasn't acquired
-					while(index < MAX_LOCKS)
-					{
-						if ((d->read_wait[index] == 0) && (open == -1))
-						{
+					while(index < MAX_LOCKS){
+						if ((d->read_wait[index] == 0) && (open == -1)){
  							open = index;
 						}
 
 						// Process is already in read_wait array
-						if(d->read_wait[index] == current->pid)
-						{
+						if(d->read_wait[index] == current->pid){
 							index = -1; 
 							break; 
 						}
 						index++;
 					}
 
-					if (index != -1)
-					{
+					if (index != -1){
 						d->read_wait[open] = current->pid;
 					}
 				}
 			}
 
-			if(cmd == OSPRDIOCACQUIRE)
-			{
+			if(cmd == OSPRDIOCACQUIRE){
 				// Check to see if there is a deadlock
-				if(osprd_check_deadlocks() == -1)
-				{      
+				if(osprd_check_deadlocks() == -1){      
 					osp_spin_unlock(&d->mutex); 
 					return -EDEADLK; 
 				}                              
@@ -501,15 +479,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				
 				osp_spin_unlock(&d->mutex);
 
-				if (wait_status == -ERESTARTSYS)
-				{
+				if (wait_status == -ERESTARTSYS){
 					return -ERESTARTSYS;
 				}
 
 				schedule();
 			}
-			else
-			{
+			else{
 				osp_spin_unlock(&d->mutex);
 				r = -EBUSY;
 				break;
@@ -541,15 +517,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		osp_spin_lock(&d->mutex);
 		
 		// Ramdisk has not yet been locked
-		if((filp->f_flags & F_OSPRD_LOCKED) == 0)
-		{
+		if((filp->f_flags & F_OSPRD_LOCKED) == 0){
 			r = -EINVAL;
 		}
-		else
-		{
+		else {
 			// Check to see if file is open for writing
-			if(filp_writable)
-			{	
+			if(filp_writable){	
 				// Remove write lock
 				d->write_lock--;
 				d->write_lock_owner = 0;
@@ -558,16 +531,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				wake_up_all(&d->blockq);
 			}
 			// File is open for reading
-			else
-			{
+			else{
 				// Remove read lock
 				d->read_locks--;	
 
 				index = 0;
-				while(index < MAX_LOCKS)
-				{
-					if(d->read_hold[index] == current->pid)
-					{ 
+				while(index < MAX_LOCKS){
+					if(d->read_hold[index] == current->pid){ 
 						d->read_hold[index] = 0; 
 						break;
 					}
@@ -586,9 +556,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		r = -ENOTTY; /* unknown command */
 	return r;
 }
-
-
-
 
 // Initialize internal fields for an osprd_info_t.
 
