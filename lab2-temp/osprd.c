@@ -24,6 +24,9 @@
  * is locked. */
 #define F_OSPRD_LOCKED	0x80000
 
+/* Maximum number of locks */
+#define MAX_LOCKS       100
+
 /* eprintk() prints messages to the console.
  * (If working on a real Linux machine, change KERN_NOTICE to KERN_ALERT or
  * KERN_EMERG so that you are sure to see the messages.  By default, the
@@ -64,6 +67,19 @@ typedef struct osprd_info {
 
 	/* HINT: You may want to add additional fields to help
 	         in detecting deadlock. */
+	
+	unsigned int read_locks;        // Amount of read locks
+
+        pid_t read_wait[MAX_LOCKS];     // Array that holds all process pids waiting for read lock
+
+        pid_t read_hold[MAX_LOCKS];     // Array that holds all process pids holding read lock
+
+        unsigned int write_lock;        // Amount of write locks
+                                        // Either 0 or 1, no more
+
+        pid_t write_lock_owner;         // Pid of process with write lock. 0 if not taken.
+
+        pid_t write_wait[MAX_LOCKS];    // Array that holds all process pids waiting for write lock
 
 	// The following elements are used internally; you don't need
 	// to understand them.
@@ -201,6 +217,76 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+/*
+ * Below are functions used to implement deadlocking decalred forward
+ */
+
+static int osprd_check_process(pid_t, int*, int);
+
+static int osprd_check_disk(int, int*, int);
+
+static int osprd_check_deadlocks(void);
+
+static int osprd_check_process(pid_t proc, int* path, int pos)
+{
+	int i,k;
+
+	for(i = 0; i < NOSPRD; i++){
+		for(k = 0; k < MAX_LOCKS; k++){
+			if ((osprds[i].read_wait[k] == proc) || (osprds[i].write_wait[k]==proc))			{
+                                if (osprd_check_disk(i, path, pos) == -1)
+					return -1;
+			}
+		}
+	}
+	return 0;		
+}
+
+static int osprd_check_disk(int disk_num, int* path, int pos)
+{
+	int k;
+	int process;
+
+	for(k = -1; k < MAX_LOCKS; k++){
+
+		process = 0;
+		
+		if(k < pos){
+			if(path[k] == disk_num)
+				return -1;
+		}
+		else if((osprds[disk_num].write_lock_owner != 0) && (k  != -1)){
+			process = osprds[disk_num].write_lock_owner;
+		}
+		else if((osprds[disk_num].read_hold[k]) != 0){
+                        process = osprds[disk_num].read_hold[k];
+                }
+
+		if(process){
+			path[pos] = disk_num;
+			
+			if (osprd_deadlock_process(process, path, pos+1) == -1){
+                                return -1;
+                        }
+				
+		}
+	}
+	
+	return 0;
+}
+
+static int osprd_check_deadlocks(void)
+{
+	int path[NOSPRD];
+	
+	int i;
+	for(i = 0; i < NOSPRD; i++){
+		if(osprd_check_disk(i, path, 0)){
+			return -1;
+		}
+	}
+	return 0;
+}
 
 /*
  * osprd_lock
