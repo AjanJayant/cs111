@@ -265,7 +265,7 @@ static int osprd_check_disk(int disk_num, int* path, int pos)
 		if(process){
 			path[pos] = disk_num;
 			
-			if (osprd_deadlock_process(process, path, pos+1) == -1){
+			if (osprd_check_process(process, path, pos+1) == -1){
                                 return -1;
                         }
 				
@@ -300,6 +300,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		unsigned int cmd, unsigned long arg)
 {
 	osprd_info_t *d = file2osprd(filp);	// device info
+
+	if(d == NULL)
+	{
+		return -1;
+	}
+
 	int r = 0;			// return value: initially 0
 
 	// is file open for writing?
@@ -310,7 +316,10 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 	// Set 'r' to the ioctl's return value: 0 on success, negative on error
 
-	if (cmd == OSPRDIOCACQUIRE) {
+	int index, open;
+
+	if ( (cmd == OSPRDIOCACQUIRE) || (cmd == OSPRDIOCTRYACQUIRE)) 
+	{
 
 		// EXERCISE: Lock the ramdisk.
 		//
@@ -348,10 +357,164 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// be protected by a spinlock; which ones?)
 
 		// Your code here (instead of the next two lines).
-		eprintk("Attempting to acquire\n");
-		r = -ENOTTY;
 
-	} else if (cmd == OSPRDIOCTRYACQUIRE) {
+		while(1)
+		{
+			// Acquire lock
+			osp_spin_lock(&d->mutex);
+
+			// If file is open for writing then acquire write lock
+			if(filp_writable)
+			{
+				// Check to see if there are no locks. 
+				// If not, then we acquire write lock.
+				if((d->read_locks == 0) && (d->write_lock == 0))
+				{
+					d->write_lock_owner = current->pid;
+					
+					// Set flag to locked
+					filp->f_flags |= F_OSPRD_LOCKED;
+
+					// Write lock acquired and indicated
+					d->write_lock++;
+
+					index = 0;
+					while(index < MAX_LOCKS)
+					{
+						if(d->write_wait[index] == current->pid)
+						{ 
+							d->write_wait[index] = 0;
+							break; 
+						}
+
+						index++;
+					}
+					
+					osp_spin_unlock(&d->mutex);
+					break;
+				}
+				// Write lock was not acquired
+				else if(cmd == OSPRDIOCACQUIRE)
+				{
+					index = 0;
+					open = -1;
+
+					while(index < MAX_LOCKS)
+					{
+						if((d->write_wait[index] == 0) && (open == -1))
+						{
+							open = index;
+						}
+
+						// Check to see if process is already in write_wait array
+						if(d->write_wait[index] == current->pid)
+						{
+							index = -1; 
+							break; 
+						}
+
+						index++;
+					}
+
+					if (index != -1) 
+						d->write_wait[open] = current->pid;
+				}
+			}
+			// Acquire read lock
+			else
+			{
+				if(d->write_lock == 0)
+				{
+					index = 0;
+
+					// Add lock to read_hole array
+					while(index < MAX_LOCKS)
+					{
+						if(d->read_hold[index] == 0)
+						{
+							d->read_hold[index] = current->pid;
+							break;
+						}
+						index++;
+					}
+
+					// Acquired read lock
+					filp->f_flags |= F_OSPRD_LOCKED;
+					d->read_locks++;
+
+					index = 0;
+				
+					// Remove process from read_wait array - READ lock acquired
+					while(index < MAX_LOCKS) 
+					{
+						if(d->read_wait[index] == current->pid)
+						{ 
+							d->read_wait[index] = 0;
+							break; 
+						}
+						index++;
+					}        
+
+					osp_spin_unlock(&d->mutex); 
+					break; 
+				}
+				// Could not acquire READ lock
+				else if(cmd == OSPRDIOCACQUIRE)
+				{
+					index = 0;
+					open = -1;
+
+					// Add process to read_wait array since lock wasn't acquired
+					while(index < MAX_LOCKS)
+					{
+						if ((d->read_wait[index] == 0) && (open == -1))
+						{
+ 							open = index;
+						}
+
+						// Process is already in read_wait array
+						if(d->read_wait[index] == current->pid)
+						{
+							index = -1; 
+							break; 
+						}
+						index++;
+					}
+
+					if (index != -1)
+					{
+						d->read_wait[open] = current->pid;
+					}
+				}
+			}
+
+			if(cmd == OSPRDIOCACQUIRE)
+			{
+				// Check to see if there is a deadlock
+				if(osprd_check_deadlocks() == -1)
+				{      
+					osp_spin_unlock(&d->mutex); 
+					return -EDEADLK; 
+				}                              
+				
+				int wait_status = wait_event_interruptible(d->blockq, 1);
+				
+				osp_spin_unlock(&d->mutex);
+
+				if (wait_status == -ERESTARTSYS)
+				{
+					return -ERESTARTSYS;
+				}
+
+				schedule();
+			}
+			else
+			{
+				osp_spin_unlock(&d->mutex);
+				r = -EBUSY;
+				break;
+			}
+		}
 
 		// EXERCISE: ATTEMPT to lock the ramdisk.
 		//
@@ -361,8 +524,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// Otherwise, if we can grant the lock request, return 0.
 
 		// Your code here (instead of the next two lines).
-		eprintk("Attempting to try acquire\n");
-		r = -ENOTTY;
+		
+		// This excercise has been done within the first if statement
 
 	} else if (cmd == OSPRDIOCRELEASE) {
 
@@ -374,12 +537,57 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// you need, and return 0.
 
 		// Your code here (instead of the next line).
-		r = -ENOTTY;
+		
+		osp_spin_lock(&d->mutex);
+		
+		// Ramdisk has not yet been locked
+		if((filp->f_flags & F_OSPRD_LOCKED) == 0)
+		{
+			r = -EINVAL;
+		}
+		else
+		{
+			// Check to see if file is open for writing
+			if(filp_writable)
+			{	
+				// Remove write lock
+				d->write_lock--;
+				d->write_lock_owner = 0;
+
+				// Wake up all the other processes
+				wake_up_all(&d->blockq);
+			}
+			// File is open for reading
+			else
+			{
+				// Remove read lock
+				d->read_locks--;	
+
+				index = 0;
+				while(index < MAX_LOCKS)
+				{
+					if(d->read_hold[index] == current->pid)
+					{ 
+						d->read_hold[index] = 0; 
+						break;
+					}
+					index++;
+				}
+				
+				// Wake up all the other processes
+				wake_up_all(&d->blockq);
+			}
+
+			filp->f_flags &= !F_OSPRD_LOCKED;
+		}
+		osp_spin_unlock(&d->mutex);
 
 	} else
 		r = -ENOTTY; /* unknown command */
 	return r;
 }
+
+
 
 
 // Initialize internal fields for an osprd_info_t.
@@ -391,6 +599,20 @@ static void osprd_setup(osprd_info_t *d)
 	osp_spin_lock_init(&d->mutex);
 	d->ticket_head = d->ticket_tail = 0;
 	/* Add code here if you add fields to osprd_info_t. */
+
+	d->read_locks = 0;   
+	d->write_lock = 0;  
+	
+	int index = 0;
+	while(index < MAX_LOCKS)
+	{ 
+		d->read_wait[index] = 0;
+		d->read_hold[index] = 0;
+
+		d->write_wait[index] = 0;
+
+		index++;   
+	} 
 }
 
 
