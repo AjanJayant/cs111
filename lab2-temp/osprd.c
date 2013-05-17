@@ -37,7 +37,7 @@
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DESCRIPTION("CS 111 RAM Disk");
 // EXERCISE: Pass your names into the kernel as the module's authors.
-MODULE_AUTHOR("Ajan Jayant and Rishi Droan");
+MODULE_AUTHOR("Ajan Jayant and Droan Rishi");
 
 #define OSPRD_MAJOR	222
 
@@ -430,7 +430,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 					index = 0;
 				
-					// Remove process from read_wait array - READ lock acquired
 					while(index < MAX_LOCKS) {
 						if(d->read_wait[index] == current->pid){ 
 							d->read_wait[index] = 0;
@@ -448,13 +447,11 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 					index = 0;
 					open = -1;
 
-					// Add process to read_wait array since lock wasn't acquired
 					while(index < MAX_LOCKS){
 						if ((d->read_wait[index] == 0) && (open == -1)){
  							open = index;
 						}
 
-						// Process is already in read_wait array
 						if(d->read_wait[index] == current->pid){
 							index = -1; 
 							break; 
@@ -491,17 +488,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				break;
 			}
 		}
-
-		// EXERCISE: ATTEMPT to lock the ramdisk.
-		//
-		// This is just like OSPRDIOCACQUIRE, except it should never
-		// block.  If OSPRDIOCACQUIRE would block or return deadlock,
-		// OSPRDIOCTRYACQUIRE should return -EBUSY.
-		// Otherwise, if we can grant the lock request, return 0.
-
-		// Your code here (instead of the next two lines).
-		
-		// This excercise has been done within the first if statement
 
 	} else if (cmd == OSPRDIOCRELEASE) {
 
