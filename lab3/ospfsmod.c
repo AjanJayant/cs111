@@ -552,7 +552,18 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 static uint32_t
 allocate_block(void)
 {
-	/* EXERCISE: Your code here */
+	void* bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+	uint32_t os_nblocks = ospfs_super->os_nblocks;
+
+	uint32_t i;
+
+	for(i = 0; i < os_nblocks; i++){
+		if(bitvector_test(bitmap, i) == 1){
+			bitvector_clear(bitmap, i);
+		return i;
+		}
+	}
+		
 	return 0;
 }
 
