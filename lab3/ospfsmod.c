@@ -560,7 +560,8 @@ allocate_block(void)
 	for(i = 0; i < os_nblocks; i++){
 		if(bitvector_test(bitmap, i) == 1){
 			bitvector_clear(bitmap, i);
-		return i;
+			memset(ospfs_block(i), 0,  OSPFS_BLKSIZE);
+			return i;
 		}
 	}
 		
@@ -583,6 +584,14 @@ static void
 free_block(uint32_t blockno)
 {
 	/* EXERCISE: Your code here */
+        void* bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+	uint32_t os_nblocks = ospfs_super->os_nblocks;
+	uint32_t valid_bound = ospfs_super->os_firstinob + ospfs_super->os_ninodes/OSPFS_BLKINODES;
+
+	if(blockno > valid_bound){
+		bitvector_set(bitmap, blockno);
+	}
+	return;
 }
 
 
