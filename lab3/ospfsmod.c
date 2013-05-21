@@ -759,11 +759,94 @@ add_block(ospfs_inode_t *oi)
 
 	// keep track of allocations to free in case of -ENOSPC
 	uint32_t *allocated[2] = { 0, 0 };
-
+	
 	/* EXERCISE: Your code here */
-	return -EIO; // Replace this line
-}
 
+	/* Varaiable declerations follow*/
+
+	int32_t is_direct = direct_index(n);
+        int32_t is_indirect = indir_index(n);
+        int32_t is_indirect2 = indir2_index(n);
+
+	uint32_t* indir_block;
+	uint32_t* indir2_block;
+
+	uint32_t addblock = 0;
+	
+	if(is_direct < 0){
+		eprintk("Invalid block requested\n");
+		return -EIO; // Replace this line
+	}
+	// Do following when adding to direct block
+	else if(is_indirect == -1 && is_indirect2 == -1){
+		addblock = allocate_block();
+		if(!addblock){
+			eprintk("Error addindg direct block\n");
+               		return -ENOSPC;
+		}
+		oi->oi_direct[n] = addblock;
+	}
+	// Do following when adding to indirect block
+	else if(is_indirect == 0 && is_indirect2 == -1){
+		if(n >= OSPFS_NDIRECT){
+			addblock = allocate_block();
+			if(!addblock){
+				eprintk("Error adding indirectblock\n");
+              			return -ENOSPC;
+			}
+		        oi->oi_indirect = addblock;
+            		allocated[0] = addblock;
+		}
+          	addblock = allocate_block();
+          	if(!addblock){
+            		if(allocated[0])
+             			 free_block(allocated[0]);
+           			 eprintk("Error adding new block\n");
+          	  		return -ENOSPC;
+          	}	
+          	indir_block = (uint32_t *)ospfs_block(oi->oi_indirect);
+          	indir_block[is_direct] = addblock;
+	}
+	// Do the following when adding a doubly indirect block
+	else if(!is_indirect2){
+		/*We allocate a doubly indirect block, an indirect block
+		* and a direct block, in that order if need be */
+		if(n >= OSPFS_NDIRECT + OSPFS_NINDIRECT){
+			addblock = allocate_block();
+			if(!addblock){
+                                eprintk("Error adding doubly indirect block\n");
+                                return -ENOSPC;
+                        }
+                        oi->oi_indirect2 = addblock;
+                        allocated[0] = addblock;
+		}
+		if(!is_direct){
+			if(!addblock){
+                        	if(allocated[0]){
+                                 	free_block(allocated[0]);
+                                 	eprintk("Error adding new block\n");
+                                return -ENOSPC;
+                		}
+                	indir_block = (uint32_t *)ospfs_block(oi->oi_indirect);
+                	indir_block[is_direct] = addblock;
+			}
+		}
+		addblock = allocate_block();
+		if(!addblock){
+	            if(allocated[0] != 0)
+              		free_block(allocated[0]);
+            	    if(allocated[1] != 0)
+              		free_block(allocated[1]);
+	            eprintk("Error adding direct block for indirect2\n");
+        	    return -ENOSPC;
+		}
+		indir_block = (uint32_t *)ospfs_block(oi->oi_indirect2);
+		indir2_block = (uint32_t *)ospfs_block(indir_block[is_indirect]);
+        	indir2_block[is_direct] = addblock;
+	}
+        oi->oi_size = (ospfs_size2nblocks(oi->oi_size) + 1)*OSPFS_BLKSIZE;
+        return 0;	
+}
 
 // remove_block(ospfs_inode_t *oi)
 //   Removes a single data block from the end of a file, freeing
