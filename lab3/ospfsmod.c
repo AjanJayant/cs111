@@ -429,6 +429,9 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	int r = 0;		/* Error return value, if any */
 	int ok_so_far = 0;	/* Return value from 'filldir' */
 
+	/* ISO C90 forbids mixed declarations and code */
+	int file_type;
+
 	// f_pos is an offset into the directory's data, plus two.
 	// The "plus two" is to account for "." and "..".
 	if (r == 0 && f_pos == 0) {
@@ -482,7 +485,6 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		od = ospfs_inode_data(dir_oi, (f_pos - 2)* OSPFS_DIRENTRY_SIZE);
 		entry_oi  = ospfs_inode(od->od_ino);
 		
-		int file_type;
 		if(od->od_ino == 0){
 			f_pos++;
 			continue;
@@ -1371,6 +1373,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	uint32_t entry_ino = 0;
 	/* EXERCISE: Your code here. */
 
+	uint32_t ctr;
 	ospfs_direntry_t *dest_dir;
 	ospfs_inode_t *new_inode = ospfs_inode(OSPFS_ROOT_INO);
 
@@ -1455,6 +1458,8 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	/* EXERCISE: Your code here. */
 	//return -EINVAL;
 
+
+	ospfs_inode_t *open_inode = ospfs_inode(OSPFS_ROOT_INO);
 	ospfs_direntry_t *dest_dir;
 	ospfs_symlink_inode_t *symlink_oi;
 
