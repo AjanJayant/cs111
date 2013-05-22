@@ -617,7 +617,6 @@ free_block(uint32_t blockno)
 {
 	/* EXERCISE: Your code here */
         void* bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
-	uint32_t os_nblocks = ospfs_super->os_nblocks;
 	uint32_t valid_bound = ospfs_super->os_firstinob + ospfs_super->os_ninodes/OSPFS_BLKINODES;
 
 	if(blockno > valid_bound){
@@ -711,10 +710,10 @@ direct_index(uint32_t b)
 		return b;
 	}
 	else if(b < OSPFS_NDIRECT + OSPFS_NINDIRECT){
-		return (b - (OSPFS_NDIRECT + OSPFS_NINDIRECT));
+		return (b - OSPFS_NDIRECT);
 	}
-	else if(b >= OSPFS_NDIRECT + OSPFS_NINDIRECT){
-		return ((b - (OSPFS_NDIRECT + OSPFS_NINDIRECT)) % OSPFS_NINDIRECT);
+	else if(b >= OSPFS_NDIRECT + OSPFS_NINDIRECT && b < OSPFS_MAXFILEBLKS){
+		return (b - (OSPFS_NDIRECT + OSPFS_NINDIRECT) % OSPFS_NINDIRECT);
 	}
 	else {
 		return -1;
@@ -978,31 +977,25 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 	int r = 0;
 
 	while (ospfs_size2nblocks(oi->oi_size) < ospfs_size2nblocks(new_size)) {
-	        /* EXERCISE: Your code here */
-		r = add_block(oi);
-		if(r == -ENOSPC){
-			while(ospfs_size2nblocks(old_size) < ospfs_size2nblocks(oi->oi_size)){
-			r = remove_block(oi);
-			}
-			oi->oi_size = old_size;
-		}
-		else if(r == -EIO){
-			return r;
-		}
-	}	
+    r = add_block(oi);
+    if(r == -ENOSPC)
+      new_size = old_size;
+    else if(r == -EIO)
+      return r;
+	}
 	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) {
-	        /* EXERCISE: Your code here */
-
-		r = remove_block(oi);
-		oi->oi_size = new_size;
-		//return -EIO; // Replace this line
+    r = remove_block(oi);
+    if(r == -EIO)
+      return r;
 	}
 
 	/* EXERCISE: Make sure you update necessary file meta data
 	             and return the proper value. */
-	oi->oi_size = new_size;
-	return -EIO; // Replace this line
+  if( r == 0)
+    oi->oi_size = new_size;
+	return r;
 }
+
 
 
 // ospfs_notify_change
@@ -1064,22 +1057,24 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 	int retval = 0;
 	size_t amount = 0;
 
+	// EXERCISE:
 	// Make sure we don't read past the end of the file!
 	// Change 'count' so we never read past the end of the file.
-	/* EXERCISE: Your code here */
-	
-	
-	if(*f_pos > oi->oi_size){
-		count = 0;//goto done;
-	}
-	else if(count > oi->oi_size - *f_pos){
+	// Information on Variables
+	//		oi->oi_size		size of the file we are reading
+	//		*f_pos				start of read area
+	//		count					end of read area
+	if(*f_pos + count > oi->oi_size)
+	{
 		count = oi->oi_size - *f_pos;
 	}
+	
+	
 	// Copy the data to user block by block
 	while (amount < count && retval >= 0) {
 		uint32_t blockno = ospfs_inode_blockno(oi, *f_pos);
-		uint32_t n;
-		char *data;
+		uint32_t n;	// Data to copy
+		char *data; // Kernel buffer
 
 		// ospfs_inode_blockno returns 0 on error
 		if (blockno == 0) {
@@ -1089,21 +1084,30 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 
 		data = ospfs_block(blockno);
 
-		// Figure out how much data is left in this block to read.
-		// Copy data into user space. Return -EFAULT if unable to write
-		// into user space.
-		// Use variable 'n' to track number of bytes moved.
-		/* EXERCISE: Your code here */
+		// EXERCISE:
+		// Calculate how much data to copy to the user by seeing if the
+		// amount of data we need to copy would exceed our block size
+		// Store information in variable n
+		uint32_t offset = *f_pos % OSPFS_BLKSIZE;
+		if(count + offset - amount > OSPFS_BLKSIZE)
+		{
+			n = OSPFS_BLKSIZE - offset;
+		}
+		else
+		{
+			n = count - amount;
+		}
 		
-		n = (count - amount > OSPFS_BLKSIZE)? *f_pos % OSPFS_BLKSIZE: count -amount;
-		if(!(copy_to_user((void*)buffer, (void*)data, n))){
+		// Copy data to the user space
+		retval = copy_to_user(buffer, data, n);
+
+		// Check for copy integrity, and return -EFAULT if unable to write
+		if(retval < 0)
+		{
 			retval = -EFAULT;
 			goto done;
 		}
-
-		//retval = -EIO;  Replace these lines
-		//goto done;
-
+		
 		buffer += n;
 		amount += n;
 		*f_pos += n;
@@ -1112,7 +1116,6 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
     done:
 	return (retval >= 0 ? amount : retval);
 }
-
 
 // ospfs_write
 //	Linux calls this function to write data to a file.
@@ -1141,22 +1144,21 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 	// Support files opened with the O_APPEND flag.  To detect O_APPEND,
 	// use struct file's f_flags field and the O_APPEND bit.
 	/* EXERCISE: Your code here */
-
-        if(filp->f_flags & O_APPEND) {
-                *f_pos = oi->oi_size;
-        }
-
+	if(filp->f_flags & O_APPEND) {
+		*f_pos = oi->oi_size;
+	}
 	// If the user is writing past the end of the file, change the file's
 	// size to accomodate the request.  (Use change_size().)
 	/* EXERCISE: Your code here */
-
-        if (*f_pos+count > oi->oi_size) {
-                retval = change_size(oi, count + *f_pos);
-                if (retval < 0)
-                        goto done;
-                else
-                        retval = 0;
-        }
+	
+	if (*f_pos+count > oi->oi_size) {
+		retval = change_size(oi,count+*f_pos);
+		if (retval < 0)
+			goto done;
+		else
+			retval = 0;
+	}
+	
 	// Copy data block by block
 	while (amount < count && retval >= 0) {
 		uint32_t blockno = ospfs_inode_blockno(oi, *f_pos);
@@ -1169,15 +1171,22 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 		}
 
 		data = ospfs_block(blockno);
-
 		// Figure out how much data is left in this block to write.
 		// Copy data from user space. Return -EFAULT if unable to read
 		// read user space.
 		// Keep track of the number of bytes moved in 'n'.
 		/* EXERCISE: Your code here */
-		retval = -EIO; // Replace these lines
-		goto done;
-
+		
+		// set ptr to f_pos in current block
+		data += *f_pos % OSPFS_BLKSIZE;
+		n = OSPFS_BLKSIZE - (*f_pos % OSPFS_BLKSIZE);
+		if(n > count - amount)
+			n = count - amount;
+		if(copy_from_user(data, buffer, n) != 0){
+			retval = -EFAULT;
+			goto done;
+		}
+		
 		buffer += n;
 		amount += n;
 		*f_pos += n;
