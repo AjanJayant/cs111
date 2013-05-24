@@ -1064,13 +1064,11 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 	//		oi->oi_size		size of the file we are reading
 	//		*f_pos				start of read area
 	//		count					end of read area
-	if(*f_pos + count > oi->oi_size)
-	{
+	if(*f_pos + count > oi->oi_size){
 		count = oi->oi_size - *f_pos;
 	}
 	
 	
-	// Copy the data to user block by block
 	while (amount < count && retval >= 0) {
 		uint32_t blockno = ospfs_inode_blockno(oi, *f_pos);
 		uint32_t n;	// Data to copy
@@ -1089,12 +1087,10 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 		// amount of data we need to copy would exceed our block size
 		// Store information in variable n
 		uint32_t offset = *f_pos % OSPFS_BLKSIZE;
-		if(count + offset - amount > OSPFS_BLKSIZE)
-		{
+		if(count + offset - amount > OSPFS_BLKSIZE){
 			n = OSPFS_BLKSIZE - offset;
 		}
-		else
-		{
+		else{
 			n = count - amount;
 		}
 		
@@ -1102,8 +1098,7 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 		retval = copy_to_user(buffer, data, n);
 
 		// Check for copy integrity, and return -EFAULT if unable to write
-		if(retval < 0)
-		{
+		if(retval < 0){
 			retval = -EFAULT;
 			goto done;
 		}
@@ -1151,7 +1146,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 	// size to accomodate the request.  (Use change_size().)
 	/* EXERCISE: Your code here */
 	
-	if (*f_pos+count > oi->oi_size) {
+	if (*f_pos + count > oi->oi_size) {
 		retval = change_size(oi,count+*f_pos);
 		if (retval < 0)
 			goto done;
@@ -1467,36 +1462,30 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	/* EXERCISE: Your code here. */
 	//return -EINVAL;
 
-
 	ospfs_inode_t *open_inode = ospfs_inode(OSPFS_ROOT_INO);
 	ospfs_direntry_t *dest_dir;
 	ospfs_symlink_inode_t *symlink_oi;
 
-	// error checking
-	if(find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len) != 0)
+	if(!find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len))
 		return -EEXIST;
-	
 	if(dentry->d_name.len > OSPFS_MAXNAMELEN)
 		return -ENAMETOOLONG;
-	
 	if (strlen(symname) > OSPFS_MAXSYMLINKLEN)
 		return -ENAMETOOLONG;
-	
-	// make a new directory
+
 	dest_dir = create_blank_direntry(dir_oi);
 	if(IS_ERR(dest_dir))
 		return PTR_ERR(dest_dir);
 	
 	//we need to find inode with nlink = 0, meaning it is empty
 	entry_ino = OSPFS_ROOT_INO;
-	while(entry_ino < ospfs_super->os_ninodes)
-	{
-	  open_inode = ospfs_inode(entry_ino);
-	  if (open_inode->oi_nlink == 0) //then it is a free inode 
-		  break;
-	  entry_ino++;
+	while(entry_ino < ospfs_super->os_ninodes){
+	  	open_inode = ospfs_inode(entry_ino);
+	  	if (open_inode->oi_nlink == 0) //then it is a free inode 
+			  break;
+	  	entry_ino++;
 	} 
-	//when while loop exits check to make sure it did not finish loop
+
 	if (entry_ino == ospfs_super->os_ninodes) {
 		return -ENOSPC;
 	}
@@ -1510,9 +1499,9 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	dest_dir->od_name[dentry->d_name.len] = 0;
 	
 	//init the symlink
-	symlink_oi->oi_ftype = OSPFS_FTYPE_SYMLINK;
-	symlink_oi->oi_size = strlen(symname);
 	symlink_oi->oi_nlink++;
+        symlink_oi->oi_ftype = OSPFS_FTYPE_SYMLINK;
+        symlink_oi->oi_size = strlen(symname);
 	memcpy (symlink_oi->oi_symlink, symname, strlen(symname));
 	symlink_oi->oi_symlink[strlen(symname)] = 0;
 
