@@ -1,5 +1,5 @@
-Name:
-UCLA ID:
+Name: Ajan Jayant
+UCLA ID: 904039631
 
 Collaborators:
 
@@ -7,8 +7,9 @@ Collaborators:
 
 Response to Exercise 1:
 
-The name of the scheduling algorithm is:
-
+The name of the scheduling algorithm is: mean round robin scheduling.
+The code works in the following way:
+The start function in schedos.c is run. Control flow enters a for loop, updates the current current screen cursor position to the character 1 after which it calls the sys_yield function. This function calls a system call using the int instruction and yields control to the kernel. The yield system call calls the scheduling algorithm which checks if the next process in the proc_array is runnable and runs it if it is. It is round robin scheduling as after one iteration of the loop of each process is run, the next process in the process array is run. This mean fter a fixed interval another process is run, making it round robin scheduling. The newest processes go to the end of the proc_array, so they are executed in order of arrival, meaning that the scheduling algorithm is mean round robin scheduling.
 
 (Exercise 2 is a coding exercise)
 
