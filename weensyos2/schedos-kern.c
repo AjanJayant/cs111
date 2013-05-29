@@ -209,15 +209,19 @@ schedule(void)
 	// Following all changed, implemnts question 2
 	#if CURRENT_PART == 1
 
-	if (scheduling_algorithm == 1) {
-		while (pid < NPROCS) {
+	if (scheduling_algorithm == 1) 
+		// For each pid, if the process is still runnable,
+		// we run the same process. Otherwise, we go to
+		// the next process. If the processes exceed
+		// NPROCS, we return keeping with style above
+		while (1) {
 			if(proc_array[pid].p_state == P_RUNNABLE)
 				run(&proc_array[pid]);
 			else 
 				pid++;
+			if (pid == NPROCS)
+				return;
 		}	
-		return;
-	}
 	#endif
 	// If we get here, we are running an unknown scheduling algorithm.
 	cursorpos = console_printf(cursorpos, 0x100, "\nUnknown scheduling algorithm %d\n", scheduling_algorithm);

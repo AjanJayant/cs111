@@ -12,16 +12,45 @@ The code works in the following way:
 The start function in schedos.c is run. Control flow enters a for loop, updates the current current screen cursor position to the character 1 after which it calls the sys_yield function. This function calls a system call using the int instruction and yields control to the kernel. The yield system call calls the scheduling algorithm which checks if the next process in the proc_array is runnable and runs it if it is. It is round robin scheduling as after one iteration of the loop of each process is run, the next process in the process array is run. This mean fter a fixed interval another process is run, making it round robin scheduling. The newest processes go to the end of the proc_array, so they are executed in order of arrival, meaning that the scheduling algorithm is mean round robin scheduling.
 
 (Exercise 2 is a coding exercise)
-
+Changes involve: 
+Defining CURRENT_PART as 1.
+Modifiying schedos-1.c to call sys_exit once done.
+Adding a scheduling algorithm to run when scheduling_algorithm 1 is called
 
 Response to Exercise 3:
 
-Average turnaround time for scheduling_algorithm 0:
-Average turnaround time for scheduling_algorithm 1:
+For scheduling_algorithm 0, the pattern is like this:
+1234
+So for the first iteration, 
+schedos-1.c would wait for 1 ms,
+schedos-2.c would wait for 2 ms,
+schedos-3.c would wait for 3 ms,
+schedos-4.c would wait for 4 ms
+Thereafter all would wait for 4 ms.
+So average turnaround time for scheduling)algorithm 0 =
+(1 + 2 + 3 + 4)/4 + (319*4) = 1276 + 2.5 = 1278.5 ms
 
-Average wait time for scheduling_algorithm 0:
-Average wait time for scheduling_algorithm 1:
+For scheduling_algorithm 1, the pattern is like this:
+1111.....11112222....2222 etc.
+So
+schedos-1.c will take 320 ms,
+schedos-2.c will take 320*2 ms,
+schedos-3.c will take 320*3 ms,
+schedos-4.c will take 320*4 ms,
 
+So average turnaround time for scheduling_algorithm 1 =
+800ms
+
+Wait-times can be calculated accordingly;
+
+For scheduling_algorithm 0 = (0 + 1 + 2 + 3)/4 = 1.5 ms
+For scheduling-algorithm 1 = (0 + 320 + 320*2 + 320*3)/4 = 480 ms 
+
+Average turnaround time for scheduling_algorithm 0: 1278.5ms
+Average turnaround time for scheduling_algorithm 1: 800 ms
+
+Average wait time for scheduling_algorithm 0: 1.5 ms
+Average wait time for scheduling_algorithm 1: 480 ms
 
 Exercise 4:
 

@@ -29,10 +29,14 @@ start(void)
 		sys_yield();
 	}
 	
-	/*
+	#if CURRENT_PART == 1
+
+        sys_exit(1); // Change: Implemented so schedos-1 does not yield forever.
+
+	#endif
+
+	// Will never reach here if CURRENT_PART == 1
 	// Yield forever.
 	while (1)
 		sys_yield();
-	*/
-	sys_exit(1); // Change: Implemented so schedos-1 does not yield forever.
 }
