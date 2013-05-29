@@ -28,8 +28,11 @@ start(void)
 		*cursorpos++ = PRINTCHAR;
 		sys_yield();
 	}
-
+	
+	/*
 	// Yield forever.
 	while (1)
 		sys_yield();
+	*/
+	sys_exit(1); // Change: Implemented so schedos-1 does not yield forever.
 }

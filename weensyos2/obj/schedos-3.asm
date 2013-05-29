@@ -37,5 +37,12 @@ start(void)
   400018:	40                   	inc    %eax
   400019:	3d 40 01 00 00       	cmp    $0x140,%eax
   40001e:	75 e2                	jne    400002 <start+0x2>
-  400020:	cd 30                	int    $0x30
-  400022:	eb fc                	jmp    400020 <start+0x20>
+	// the kernel can look up that register value to read the argument.
+	// Here, the status is loaded into register %eax.
+	// You can load other registers with similar syntax; specifically:
+	//	"a" = %eax, "b" = %ebx, "c" = %ecx, "d" = %edx,
+	//	"S" = %esi, "D" = %edi.
+	asm volatile("int %0\n"
+  400020:	66 b8 01 00          	mov    $0x1,%ax
+  400024:	cd 31                	int    $0x31
+  400026:	eb fe                	jmp    400026 <start+0x26>

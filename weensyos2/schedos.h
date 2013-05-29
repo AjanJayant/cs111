@@ -17,6 +17,8 @@
 #define INT_SYS_USER1		50
 #define INT_SYS_USER2		51
 
+// Change: Following macro constant defines which part we're working on
+#define CURRENT_PART		1
 
 // The current screen cursor position (stored at memory location 0x198000).
 
