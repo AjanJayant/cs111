@@ -29,7 +29,7 @@ start(void)
 		sys_yield();
 	}
 	
-	#if CURRENT_PART == 1
+	#if SCHEDULE_ALGO == 1
 
         sys_exit(1); // Change: Implemented so schedos-1 does not yield forever.
 

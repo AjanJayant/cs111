@@ -101,7 +101,7 @@ start(void)
 	scheduling_algorithm = 0;
 
 	// Following is algorithm is defined as 1 for question 2
-	#if CURRENT_PART == 1
+	#if SCHEDULE_ALGO == 1
 	scheduling_algorithm = 1;
 	#endif
 
@@ -207,22 +207,27 @@ schedule(void)
 		}
 	
 	// Following all changed, implemnts question 2
-	#if CURRENT_PART == 1
+	#if SCHEDULE_ALGO == 1
 
+	// Following highest priority defined
+	pid_t priority_pid = 1;
 	if (scheduling_algorithm == 1) 
-		// For each pid, if the process is still runnable,
-		// we run the same process. Otherwise, we go to
+		// Starting from priority 1, for each pid, if 
+		// the process is still runnable, we
+		// run the same process. Otherwise, we go to
 		// the next process. If the processes exceed
 		// NPROCS, we return keeping with style above
 		while (1) {
-			if(proc_array[pid].p_state == P_RUNNABLE)
-				run(&proc_array[pid]);
+			if(proc_array[priority_pid].p_state == P_RUNNABLE)
+				run(&proc_array[priority_pid]);
 			else 
-				pid++;
-			if (pid == NPROCS)
+				priority_pid++;
+			if (priority_pid == NPROCS)
 				return;
 		}	
+	
 	#endif
+	
 	// If we get here, we are running an unknown scheduling algorithm.
 	cursorpos = console_printf(cursorpos, 0x100, "\nUnknown scheduling algorithm %d\n", scheduling_algorithm);
 	while (1)
