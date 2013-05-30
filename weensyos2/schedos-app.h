@@ -34,6 +34,29 @@ sys_yield(void)
 		     : "cc", "memory");
 }
 
+#if SCHEDULE_ALGO == 2
+
+/*****************************************************************************
+ * sys_user1
+ *
+ *   Set priority of the process by yielding to the kernel, which will set the p *   iority accordingly.
+ *
+ *****************************************************************************/
+
+static inline void
+sys_user1(void)
+{
+        // We call a system call by causing an interrupt with the 'int'
+        // instruction.  In weensyos, the type of system call is indicated
+        // by the interrupt number -- here, INT_SYS_USER1.
+        asm volatile("int %0\n"
+                     : : "i" (INT_SYS_USER1)
+                     : "cc", "memory");
+}
+
+#endif
+
+
 
 /*****************************************************************************
  * sys_exit(status)

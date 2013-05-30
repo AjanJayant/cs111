@@ -37,5 +37,18 @@ start(void)
   400018:	40                   	inc    %eax
   400019:	3d 40 01 00 00       	cmp    $0x140,%eax
   40001e:	75 e2                	jne    400002 <start+0x2>
-  400020:	cd 30                	int    $0x30
-  400022:	eb fc                	jmp    400020 <start+0x20>
+sys_user1(void)
+{
+        // We call a system call by causing an interrupt with the 'int'
+        // instruction.  In weensyos, the type of system call is indicated
+        // by the interrupt number -- here, INT_SYS_USER1.
+        asm volatile("int %0\n"
+  400020:	cd 32                	int    $0x32
+sys_yield(void)
+{
+	// We call a system call by causing an interrupt with the 'int'
+	// instruction.  In weensyos, the type of system call is indicated
+	// by the interrupt number -- here, INT_SYS_YIELD.
+	asm volatile("int %0\n"
+  400022:	cd 30                	int    $0x30
+  400024:	eb fc                	jmp    400022 <start+0x22>

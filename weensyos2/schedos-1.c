@@ -35,6 +35,12 @@ start(void)
 
 	#endif
 
+	#if SCHEDULE_ALGO == 2
+
+	sys_user1();
+		
+	#endif
+
 	// Will never reach here if CURRENT_PART == 1
 	// Yield forever.
 	while (1)

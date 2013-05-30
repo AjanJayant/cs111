@@ -92,11 +92,6 @@ start(void)
 		// Mark the process as runnable!
 		proc->p_state = P_RUNNABLE;
 
-		#if SCHEDULE_ALGO == 2
-		
-		proc->p_priority = i;
-		
-		#endif
 	}
 
 	// Initialize the cursor-position shared variable to point to the
@@ -165,11 +160,12 @@ interrupt(registers_t *reg)
 	case INT_SYS_USER1:
 		// 'sys_user*' are provided for your convenience, in case you
 		// want to add a system call.
-		/* Your code here (if you want). */
+		/* This system call implements the priority scheduling  *
+		 * for 4a)						*/
 		#if SCHEDULE_ALGO == 2
 			current->p_priority = reg->reg_eax;	
 		#endif
-		//run(current);
+		run(current);
 
 	case INT_SYS_USER2:
 		/* Your code here (if you want). */
@@ -187,49 +183,6 @@ interrupt(registers_t *reg)
 
 	}
 }
-
-
-
-#if SCHEDULE_ALGO == 2
-//pid_t
-void
-sort_priority(process_t proc_array[])
-{
-	/*
-	pid_t proc = 2;
-	pid_t highest_priority = current->p_priority;
-	int is_valid = 0;
-	while(proc < NPROCS) {
-		if(proc_array[highest_priority].p_priority == 0){ 
-			highest_priority++;
-			proc++;
-			continue;
-		}
-		else if(proc_array[highest_priority].p_priority > proc_array[proc].p_priority) {
-			highest_priority = proc;
-			is_valid = 1;
-		}
-		proc++;	
-	}
-	if (!is_valid)
-		return 0;
-	else
-		return highest_priority;
-	*/
-
-	pid_t i;
-	pid_t j;
-	for (i = 2; i < NPROCS; i++) {
-		for (j = 1; j < i; j++) {
-			if(proc_array[i].p_priority < proc_array[j].p_priority){
-				process_t temp = proc_array[i];
-				proc_array[i] = proc_array[j];
-				proc_array[j] = temp;
-			}
-		}
-	}
-}
-#endif
 
 
 
@@ -285,33 +238,32 @@ schedule(void)
 	#endif
 
 	#if SCHEDULE_ALGO == 2
-	/*
-	pid_t priority_pid = find_priority(proc_array);
-	if (scheduling_algorithm == 2){
-        	if(proc_array[priority_pid].p_state == P_RUNNABLE)
-                	run(&proc_array[priority_pid]);
-                else {
-	        	proc_array[priority_pid].p_priority = 0;
-			priority_pid = find_priority(proc_array);
-		}
-                if (!find_priority(proc_array))
-                	return;
-	}
-	*/
-	
-	sort_priority(proc_array);
-	
-	pid_t priority_pid = proc_array[1].p_pid;	
-	while (1) {
-                        if(proc_array[priority_pid].p_state == P_RUNNABLE)
-                                run(&proc_array[priority_pid]);
-                        else
-                                priority_pid++;
-                        if (priority_pid == NPROCS)
-                                return;
-                }
 
-		
+	// Varaiables declared;
+	// i for looping through each position in th proc_array
+	// is_valid to make sure there are any processes left to execute	
+	int i, is_valid;
+	pid_t priority_pid = 1;
+	is_valid = 0;
+	if (scheduling_algorithm == 2) {
+		while(1) {
+			for(i = 2; i < NPROCS; i++) {
+			// If we come accross a process_descriptor with a higher			// priority than priority_pid, assign it to priority_pid
+				if(proc_array[priority_pid].p_priority > proc_array[i].p_priority) {
+					is_valid = 1;
+					priority_pid = i;
+				}
+			}
+                	if(proc_array[priority_pid].p_state == P_RUNNABLE)
+                		run(&proc_array[priority_pid]);
+               	 	else
+			// If it isn't runnable, set priority to value which is too high
+                		proc_array[priority_pid].p_priority = 6;
+                	if (!is_valid)
+                		return;
+                	}
+	}
+
 	#endif 	
 	// If we get here, we are running an unknown scheduling algorithm.
 	cursorpos = console_printf(cursorpos, 0x100, "\nUnknown scheduling algorithm %d\n", scheduling_algorithm);
