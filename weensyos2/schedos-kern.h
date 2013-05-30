@@ -30,6 +30,12 @@ typedef struct process {
 
 	procstate_t p_state;		// Process state; see above
 	int p_exit_status;		// Process's exit status
+
+	#if SCHEDULE_ALGO == 2
+	
+	int p_priority;			// Process priority
+
+	#endif
 } process_t;
 
 
