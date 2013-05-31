@@ -21,6 +21,13 @@
 void
 start(void)
 {
+
+	#if SCHEDULE_ALGO == 2
+
+        sys_user1(5 -PRINTCHAR);
+
+        #endif
+
 	int i;
 
 	for (i = 0; i < RUNCOUNT; i++) {
@@ -29,17 +36,11 @@ start(void)
 		sys_yield();
 	}
 	
-	#if SCHEDULE_ALGO == 1
+	//#if SCHEDULE_ALGO == 1
 
         sys_exit(1); // Change: Implemented so schedos-1 does not yield forever.
 
-	#endif
-
-	#if SCHEDULE_ALGO == 2
-
-	sys_user1();
-		
-	#endif
+	//#endif
 
 	// Will never reach here if CURRENT_PART == 1
 	// Yield forever.

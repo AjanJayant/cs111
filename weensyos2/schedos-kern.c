@@ -92,6 +92,7 @@ start(void)
 		// Mark the process as runnable!
 		proc->p_state = P_RUNNABLE;
 
+		proc->p_priority = 5 -i;
 	}
 
 	// Initialize the cursor-position shared variable to point to the
@@ -241,29 +242,28 @@ schedule(void)
 
 	// Varaiables declared;
 	// i for looping through each position in th proc_array
-	// is_valid to make sure there are any processes left to execute	
+	// is_valid to make sure there are any processes left to execute
 	int i, is_valid;
-	pid_t priority_pid = 1;
+	pid_t priority_pid = current->p_pid;
 	is_valid = 0;
+	while(1){
 	if (scheduling_algorithm == 2) {
-		while(1) {
-			for(i = 2; i < NPROCS; i++) {
+		for(i = 1; i < NPROCS; i++) {
 			// If we come accross a process_descriptor with a higher			// priority than priority_pid, assign it to priority_pid
-				if(proc_array[priority_pid].p_priority > proc_array[i].p_priority) {
-					is_valid = 1;
-					priority_pid = i;
-				}
+			if(proc_array[i].p_priority <= 3) {
+				is_valid = 1;
+				priority_pid = i;
 			}
-                	if(proc_array[priority_pid].p_state == P_RUNNABLE)
-                		run(&proc_array[priority_pid]);
-               	 	else
-			// If it isn't runnable, set priority to value which is too high
-                		proc_array[priority_pid].p_priority = 6;
-                	if (!is_valid)
-                		return;
-                	}
+		}
+                if(proc_array[priority_pid].p_state == P_RUNNABLE)
+                	run(&proc_array[priority_pid]);
+               	 else
+		// If it isn't runnable, set priority to value which is too high
+                	proc_array[priority_pid].p_priority = 6;
+                //if (!is_valid)
+                //	return;
 	}
-
+}
 	#endif 	
 	// If we get here, we are running an unknown scheduling algorithm.
 	cursorpos = console_printf(cursorpos, 0x100, "\nUnknown scheduling algorithm %d\n", scheduling_algorithm);
