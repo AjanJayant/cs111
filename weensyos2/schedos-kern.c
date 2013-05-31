@@ -92,8 +92,21 @@ start(void)
 		// Mark the process as runnable!
 		proc->p_state = P_RUNNABLE;
 
-		proc->p_priority = 5 -i;
+		#if TEST == 2
+
+		proc->p_priority = i;
+
+		#endif
 	}
+	
+	#if TEST == 1
+
+	proc_array[1].p_priority = 3;
+        proc_array[2].p_priority = 1;
+        proc_array[3].p_priority = 4;
+        proc_array[4].p_priority = 2;
+
+	#endif
 
 	// Initialize the cursor-position shared variable to point to the
 	// console's first character (the upper left).
@@ -188,6 +201,37 @@ interrupt(registers_t *reg)
 
 
 /*****************************************************************************
+ * find_highest
+ *
+ *   This function is used for priority scheduling.
+ *   It defines the highest prioirty as a very large number, and the position.
+ *   If there are no runnable processes, it spins forever.
+ *   corresponfing to it as an improbably low one.
+ *   
+ *   This function iterates through each position, finds the position 
+ *   corresponding to the lowest priority, and returns it.
+ *   
+ *
+ *****************************************************************************/
+pid_t
+find_highest()
+{
+	int low_pri = 9999;
+	int low_pos = -1;
+	pid_t i;
+	for(i = 1; i < NPROCS; i++) {
+		if(proc_array[i].p_priority <= low_pri) {
+			low_pri = proc_array[i].p_priority;
+			low_pos = i;
+		}
+	}
+	return low_pos;
+}
+
+
+
+
+/*****************************************************************************
  * schedule
  *
  *   This is the weensy process scheduler.
@@ -217,11 +261,12 @@ schedule(void)
 		}
 	
 	// Following all changed, implemnts question 2
-	#if SCHEDULE_ALGO == 1
 
-	// Following highest priority defined
-	pid_t priority_pid = 1;
-	if (scheduling_algorithm == 1) 
+	else if (scheduling_algorithm == 1) {
+		
+		// Following highest priority defined
+        	pid_t priority_pid = 1;
+
 		// Starting from priority 1, for each pid, if 
 		// the process is still runnable, we
 		// run the same process. Otherwise, we go to
@@ -235,36 +280,21 @@ schedule(void)
 			if (priority_pid == NPROCS)
 				return;
 		}	
-	
-	#endif
-
-	#if SCHEDULE_ALGO == 2
-
-	// Varaiables declared;
-	// i for looping through each position in th proc_array
-	// is_valid to make sure there are any processes left to execute
-	int i, is_valid;
-	pid_t priority_pid = current->p_pid;
-	is_valid = 0;
-	while(1){
-	if (scheduling_algorithm == 2) {
-		for(i = 1; i < NPROCS; i++) {
-			// If we come accross a process_descriptor with a higher			// priority than priority_pid, assign it to priority_pid
-			if(proc_array[i].p_priority <= 3) {
-				is_valid = 1;
-				priority_pid = i;
+	}
+	else if (scheduling_algorithm == 2) 
+		while(1) {
+			pid_t priority_pid = find_highest();
+			if(priority_pid == -1)
+				return;
+			if(proc_array[priority_pid].p_state == P_RUNNABLE) 				{
+                                run(&proc_array[priority_pid]);
+			}	
+			else
+			{
+				proc_array[priority_pid].p_priority = 9999;
 			}
 		}
-                if(proc_array[priority_pid].p_state == P_RUNNABLE)
-                	run(&proc_array[priority_pid]);
-               	 else
-		// If it isn't runnable, set priority to value which is too high
-                	proc_array[priority_pid].p_priority = 6;
-                //if (!is_valid)
-                //	return;
-	}
-}
-	#endif 	
+
 	// If we get here, we are running an unknown scheduling algorithm.
 	cursorpos = console_printf(cursorpos, 0x100, "\nUnknown scheduling algorithm %d\n", scheduling_algorithm);
 	while (1)

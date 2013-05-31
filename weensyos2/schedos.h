@@ -20,6 +20,8 @@
 // Change: Following macro constant defines which part we're working on
 #define SCHEDULE_ALGO		2
 
+// Change: Following macro constant defines test cases
+#define TEST			1
 // The current screen cursor position (stored at memory location 0x198000).
 
 extern uint16_t * volatile cursorpos;

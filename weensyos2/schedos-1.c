@@ -24,7 +24,7 @@ start(void)
 
 	#if SCHEDULE_ALGO == 2
 
-        sys_user1(5 -PRINTCHAR);
+//        sys_user1(PRINTCHAR);
 
         #endif
 
