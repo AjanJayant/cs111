@@ -92,6 +92,7 @@ start(void)
 		// Mark the process as runnable!
 		proc->p_state = P_RUNNABLE;
 
+		// Following used to test w/o system call
 		#if TEST == 2
 
 		proc->p_priority = i;
@@ -99,6 +100,7 @@ start(void)
 		#endif
 	}
 	
+	// Following used to test w/o system call
 	#if TEST == 1
 
 	proc_array[1].p_priority = 3;
@@ -176,10 +178,9 @@ interrupt(registers_t *reg)
 		// want to add a system call.
 		/* This system call implements the priority scheduling  *
 		 * for 4a)						*/
-		#if SCHEDULE_ALGO == 2
-			current->p_priority = reg->reg_eax;	
-		#endif
-		run(current);
+		current->p_priority = reg->reg_eax;
+		//run(current);
+		schedule(); // Run schedule after assigning the value in the reg			    // ister to the current's process descriptor
 
 	case INT_SYS_USER2:
 		/* Your code here (if you want). */
@@ -281,6 +282,11 @@ schedule(void)
 				return;
 		}	
 	}
+	// If the scheduling_algorithm variable is equal to 2, call the
+	// find_highest function. If it returns -1, all processes have
+	// completed and we can return.
+	// Otherwise run process specified by the highst priority.
+	// If dead mark as such and find next highest priority.
 	else if (scheduling_algorithm == 2) 
 		while(1) {
 			pid_t priority_pid = find_highest();

@@ -39,7 +39,8 @@ sys_yield(void)
 /*****************************************************************************
  * sys_user1
  *
- *   Set priority of the process by yielding to the kernel, which will set the p *   iority accordingly.
+ *   Set priority of the process by yielding to the kernel, via an interrupt.
+ *   Priority set according to arguement
  *
  *****************************************************************************/
 

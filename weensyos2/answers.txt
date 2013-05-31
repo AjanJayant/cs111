@@ -55,9 +55,10 @@ Average wait time for scheduling_algorithm 1: 480 ms
 Exercise 4:
 
 Did you complete Exercise 4A, Exercise 4B, or both for extra credit?
-
+I completed excercise 4A.
 
 Exercise 5:
+During the excecution of process 4, the interrupt occurs. When start is run, the interrupt controller is initialised. During the execution of 4, a interrupt occurs. This causes the next process to be scheduled before 4 is allowed to print. That is why the first character out of sequence (sequence being 1234) is 4.
 
 
 (Exercise 6 is a coding exercise)

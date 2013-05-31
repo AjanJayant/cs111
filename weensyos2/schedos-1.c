@@ -16,6 +16,7 @@
 
 #ifndef PRINTCHAR
 #define PRINTCHAR	('1' | 0x0C00)
+#define PRIORITY	  1
 #endif
 
 void
@@ -24,7 +25,7 @@ start(void)
 
 	#if SCHEDULE_ALGO == 2
 
-//        sys_user1(PRINTCHAR);
+        sys_user1(PRIORITY);
 
         #endif
 
@@ -35,12 +36,8 @@ start(void)
 		*cursorpos++ = PRINTCHAR;
 		sys_yield();
 	}
-	
-	//#if SCHEDULE_ALGO == 1
 
         sys_exit(1); // Change: Implemented so schedos-1 does not yield forever.
-
-	//#endif
 
 	// Will never reach here if CURRENT_PART == 1
 	// Yield forever.

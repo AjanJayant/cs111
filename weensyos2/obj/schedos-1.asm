@@ -5,7 +5,7 @@ obj/schedos-1:     file format elf32-i386
 Disassembly of section .text:
 
 00200000 <start>:
-#define PRINTCHAR	('1' | 0x0C00)
+#define PRIORITY	  1
 #endif
 
 void
