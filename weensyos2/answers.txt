@@ -62,7 +62,7 @@ During the excecution of process 4, the interrupt occurs. When start is run, the
 
 
 (Exercise 6 is a coding exercise)
-
+The comments describe the functionality. We use a semaphore by defining it in schedos.h, intializing when executing the print operation, and giving it up after that.
 
 Anything else you'd like us to know:
 

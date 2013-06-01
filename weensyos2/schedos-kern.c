@@ -65,7 +65,19 @@ start(void)
 
 	// Set up hardware (schedos-x86.c)
 	segments_init();
+
+	#if SCHEDULE_ALGO == 1 || SCHEDULE_ALGO == 2
+
 	interrupt_controller_init(0);
+
+	#endif
+
+	#if SYNC == 1
+
+	interrupt_controller_init(1);
+
+	#endif
+	
 	console_clear();
 
 	// Initialize process descriptors as empty
@@ -114,10 +126,18 @@ start(void)
 	// console's first character (the upper left).
 	cursorpos = (uint16_t *) 0xB8000;
 
+	// Intially define lock as off
+	#if SYNC == 1
+
+	quick_lock = 0;
+		
+	#endif
+	
 	// Initialize the scheduling algorithm.
 	scheduling_algorithm = 0;
 
-	// Following is algorithm is defined as 1 for question 2
+	// Following is algorithm is defined as 1 for question 2 
+	// and question 4
 	#if SCHEDULE_ALGO == 1
 	scheduling_algorithm = 1;
 	#endif
@@ -190,6 +210,12 @@ interrupt(registers_t *reg)
 		// A clock interrupt occurred (so an application exhausted its
 		// time quantum).
 		// Switch to the next runnable process.
+
+		// Atomically execute current process
+		#if SYNC == 1
+		if (quick_lock == 1)
+			run(current);
+		#endif
 		schedule();
 
 	default:

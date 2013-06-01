@@ -23,13 +23,11 @@ void
 start(void)
 {
 
-	#if SCHEDULE_ALGO == 2
+	int i;
+
+	#if SCHEDULE_ALGO == 2 || SCHEDULE_ALGO == 1
 
         sys_user1(PRIORITY);
-
-        #endif
-
-	int i;
 
 	for (i = 0; i < RUNCOUNT; i++) {
 		// Write characters to the console, yielding after each one.
@@ -37,10 +35,27 @@ start(void)
 		sys_yield();
 	}
 
+	#endif
+
+	#if SYNC == 1
+
+        for (i = 0; i < RUNCOUNT; i++) {
+                // Write characters to the console, yielding after each one.
+		// Atomically execute print
+		// Lock assignement statement
+		// After finishing, give up lock
+		atomic_swap(&quick_lock, 1);
+		atomic_swap((uint32_t *)cursorpos++, PRINTCHAR);
+		atomic_swap(&quick_lock, 0);
+		sys_yield();
+	}
+
+	#endif
+
         sys_exit(1); // Change: Implemented so schedos-1 does not yield forever.
 
-	// Will never reach here if CURRENT_PART == 1
-	// Yield forever.
-	while (1)
-		sys_yield();
+        // Yield forever.
+        while (1)
+                sys_yield();
+
 }

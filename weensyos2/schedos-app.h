@@ -34,7 +34,7 @@ sys_yield(void)
 		     : "cc", "memory");
 }
 
-#if SCHEDULE_ALGO == 2
+
 
 /*****************************************************************************
  * sys_user1
@@ -55,8 +55,6 @@ sys_user1(int priority)
 			"a" (priority)
                      : "cc", "memory");
 }
-
-#endif
 
 
 
