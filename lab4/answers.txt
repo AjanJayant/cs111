@@ -13,26 +13,44 @@
 # information you'd like us to know, please add it at the end of the file.
 
 # Partner 1
-Name: 
-Student ID: 
-Email: 
+Name: Droan Rishi
+Student ID: 603810834
+Email: droanr@ucla.edu
 
 # Partner 2 (if you're working in a team)
-Name: 
-Student ID: 
-Email: 
+Name: Ajan Jayant
+Student ID: 904039631
+Email: ajanj@ucla.edu
 
 # EXERCISE 1: What method you used to make your peer download and upload
 #    files in parallel?  (~1-3 sentences)
+In order to implement parallel download and upload procedures for peers, we used pthreads. We created an array of 1024 threads initialized in the main function. In addition, two helper functions were created: download_parallel and upload_parallel to download and upload files. In addition, a pthread_mutex_t lock in order to avoid errors when peers would attempt to register files at the same time. 
 
 # EXERCISE 2A: What conditions did you find and fix that would have
 #    triggered a buffer overrun bug?  (~1-3 sentences each)
+Two buffer overflow bugs were found:
+1. Filename buffer overflow: we check to see if the filename was longer than the FILENAMESIZ specified. We do this check in the task_upload function and also make sure that we account for "GET" and "OSP2P\n" by adding 11 to the FILENAMESIZ.
+
+2. Task buffer overflow
+Just like the filename, we had to check to see if the task was bigger than the TASKBUFSIZ specified. This check is done in the read_to_taskbuf function where we check to see if the read that is being performed is larger than the remaining buffer space. 
 
 # EXERCISE 2B: What other robustness problems did you fix?  (~1-3 sentences
 #    each)
+Following are the other robustness problems we fixed:
+1. Serve files only within current directory - we updated the task_upload function to check if the filename contains the character '/' since it is used to define the directory structure. 
+
+2. Uploading more data than filesize: in order to stop a peer from uploading a file larger than the actual size, a maximum file size restriction which is defined as a global variable. This is checked for in the task_download function, and in the event that a peer is trying to upload more than the file size, we abort the download and switch to another peer. 
+
+3. The original file size defined in the ospeer.c was 4096. We increased this size to 65536 so as to tackle the behavior of the tracker whent here are too many peers. 
+
+4. Slow peers - In order to avoid downloading from extremely slow peers, we set the minimum transfer speed to 20 bytes/sec. 
 
 # EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
 #    are they attacks?  (~3-10 sentences each)
+Following are the two attacks we implemented:
+1. Filename buffer overflow attack: This attack is carried out by sending the peer a GET request with a large filename, larger than one the buffer size. This request causes a segmentation fault and we have a filename buffer overflow attack. see the main function for this.
+
+2. Invalid directory access attack - attempting to access the directory outside the current directory. this could be used to access their passwords which we tried to implement by sending a GET request for the file "/etc/passwd/". 
 
 # Extra credit problems
 #Extra credit problem: none

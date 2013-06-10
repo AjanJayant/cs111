@@ -22,12 +22,15 @@
 #include <limits.h>
 #include "md5.h"
 #include "osp2p.h"
+#include <pthread.h>
 
 int evil_mode;			// nonzero iff this peer should behave badly
 
 static struct in_addr listen_addr;	// Define listening endpoint
 static int listen_port;
 
+//global lock for the threads
+pthread_mutex_t lock;
 
 /*****************************************************************************
  * TASK STRUCTURE
@@ -35,8 +38,10 @@ static int listen_port;
  * a bounded buffer that simplifies reading from and writing to peers.
  */
 
-#define TASKBUFSIZ	4096	// Size of task_t::buf
+#define TASKBUFSIZ	65536	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
+
+#define MAXFILESIZE 1048576 //maximum file size for a file
 
 typedef enum tasktype {		// Which type of connection is this?
 	TASK_TRACKER,		// => Tracker connection
@@ -165,8 +170,13 @@ taskbufresult_t read_to_taskbuf(int fd, task_t *t)
 
 	if (t->head == t->tail || headpos < tailpos)
 		amt = read(fd, &t->buf[tailpos], TASKBUFSIZ - tailpos);
-	else
+	else {
+		//check for task buffer overflow
+		if ((TASKBUFSIZ - tailpos) <= (headpos = tailpos))
+			return TBUF_ERROR;
+		
 		amt = read(fd, &t->buf[tailpos], headpos - tailpos);
+	}
 
 	if (amt == -1 && (errno == EINTR || errno == EAGAIN
 			  || errno == EWOULDBLOCK))
@@ -463,6 +473,9 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 	assert(tracker_task->type == TASK_TRACKER);
 
 	message("* Finding peers for '%s'\n", filename);
+	
+	//lock file
+	pthread_mutex_lock(&lock);
 
 	osp2p_writef(tracker_task->peer_fd, "WANT %s\n", filename);
 	messagepos = read_tracker_response(tracker_task);
@@ -491,6 +504,8 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 		die("osptracker's response to WANT has unexpected format!\n");
 
  exit:
+	//unlock the file when done
+	pthread_mutex_unlock(&lock);
 	return t;
 }
 
@@ -515,6 +530,13 @@ static void task_download(task_t *t, task_t *tracker_task)
 	} else if (t->peer_list->addr.s_addr == listen_addr.s_addr
 		   && t->peer_list->port == listen_port)
 		goto try_again;
+	
+	//evil mode #1 - filename buffer overflow
+	if (evil_mode == 1)
+		strcpy(t->filename, "hahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahellohahahello");
+	//evil mode #2 - try to access files outside the present directory, in this case the user's password
+	else if(evil_mode == 2)
+		strcpy(t->filename, "/etc/passwd");
 
 	// Connect to the peer and write the GET command
 	message("* Connecting to %s:%d to download '%s'\n",
@@ -552,6 +574,11 @@ static void task_download(task_t *t, task_t *tracker_task)
 		task_free(t);
 		return;
 	}
+	
+	unsigned long long time_start = time(NULL);
+	unsigned long long time2 = time(NULL);
+	int bytes = 0;
+	double transfer_speed;
 
 	// Read the file into the task buffer from the peer,
 	// and write it from the task buffer onto disk.
@@ -560,9 +587,33 @@ static void task_download(task_t *t, task_t *tracker_task)
 		if (ret == TBUF_ERROR) {
 			error("* Peer read error");
 			goto try_again;
-		} else if (ret == TBUF_END && t->head == t->tail)
+		} else if (ret == TBUF_END && t->head == t->tail){
 			/* End of file */
 			break;
+		} else {
+			//check for slow peers
+			if (time(NULL) - time_start > 5) {
+				if (time(NULL) - time2 == 0)
+					transfer_speed = 1024;
+				else {
+					transfer_speed = bytes/(time(NULL) - time2);
+				}
+				
+				if (transfer_speed < 20.0) {
+					error("connection too slow. retrying now..");
+					goto try_again;
+				}
+			
+			}
+			bytes = (t->tail) - (t->head);
+			time2 = time(NULL);
+			
+			//check for written amount vs. max file size
+			if (t->total_written > MAXFILESIZE) {
+				error("maximum file size hit. retrying now...");
+				goto try_again;
+			}
+		}
 
 		ret = write_from_taskbuf(t->disk_fd, t);
 		if (ret == TBUF_ERROR) {
@@ -578,9 +629,15 @@ static void task_download(task_t *t, task_t *tracker_task)
 		// Inform the tracker that we now have the file,
 		// and can serve it to others!  (But ignore tracker errors.)
 		if (strcmp(t->filename, t->disk_filename) == 0) {
+			//acquire lock
+			pthread_mutex_lock(&lock);
+			
 			osp2p_writef(tracker_task->peer_fd, "HAVE %s\n",
 				     t->filename);
 			(void) read_tracker_response(tracker_task);
+			
+			//unlock
+			pthread_mutex_unlock(&lock);
 		}
 		task_free(t);
 		return;
@@ -641,14 +698,33 @@ static void task_upload(task_t *t)
 			   || (t->tail && t->buf[t->tail-1] == '\n'))
 			break;
 	}
-
-	assert(t->head == 0);
-	if (osp2p_snscanf(t->buf, t->tail, "GET %s OSP2P\n", t->filename) < 0) {
-		error("* Odd request %.*s\n", t->tail, t->buf);
+	
+	// Compare size of the buffer and the filename
+	if(strlen(t->buf) > (11 + FILENAMESIZ)) {
+		error("*Filename buffer overflow attack!!");
 		goto exit;
 	}
-	t->head = t->tail = 0;
 
+	assert(t->head == 0);
+	if (!evil_mode) {
+		if (osp2p_snscanf(t->buf, t->tail, "GET %s OSP2P\n", t->filename) < 0) {
+			error("* Odd request %.*s\n", t->tail, t->buf);
+			goto exit;
+		}
+	}
+	
+	t->head = t->tail = 0;
+	
+	//check to see if peer serving files outside current directory
+	unsigned int k = 0;
+	while(k < strlen(t->filename)){
+		if((t->filename)[k] == '/'){
+			error("* Peer trying to access files outside current directory");
+			goto exit;
+		}
+		k++;
+	}
+	
 	t->disk_fd = open(t->filename, O_RDONLY);
 	if (t->disk_fd == -1) {
 		error("* Cannot open file %s", t->filename);
@@ -679,11 +755,32 @@ static void task_upload(task_t *t)
 	task_free(t);
 }
 
+//downloading in parallel
+static void *download_parallel(void* args)
+{
+	task_t *t = (task_t*) ((void**)args)[0];
+	task_t *tracker_task = (task_t*) ((void**)args)[1];
+	task_download(t, tracker_task);
+	free((void**)args);
+	pthread_exit(NULL);
+}
+
+//uploading in parallel
+static void *upload_parallel(void* task)
+{
+	task_t *t = (task_t*) task;
+	task_upload(t);
+	free(task);
+	pthread_exit(NULL);
+}
 
 // main(argc, argv)
 //	The main loop!
 int main(int argc, char *argv[])
 {
+	// Initialize the lock 
+	pthread_mutex_init(&lock, NULL);
+	
 	task_t *tracker_task, *listen_task, *t;
 	struct in_addr tracker_addr;
 	int tracker_port;
@@ -757,15 +854,69 @@ int main(int argc, char *argv[])
 	tracker_task = start_tracker(tracker_addr, tracker_port);
 	listen_task = start_listen();
 	register_files(tracker_task, myalias);
+	
+	//initialize threads for parallel downloads
+	pthread_t threads[1024];
+	int thread_id = 0;
+	
+	//initiate parallel downloads or uploads if no evil mode set
+	if (!evil_mode) {
+		// First, download files named on command line.
+		for (; argc > 1; argc--, argv++){
+			if ((t = start_download(tracker_task, argv[1]))){
+				
+				//set up arguments to do parallel download
+				void ** args = (void*) malloc(sizeof(void*) * 2);
+				args[0] = t;
+				args[1] = tracker_task;
+				
+				if(pthread_create(&threads[thread_id], NULL, download_parallel, (void*) args))
+					printf("Error (download): could not create thread");
+				else 
+					thread_id++;
+			}
+		}
+		
+		// Then accept connections from other peers and upload files to them!
+		while ((t = task_listen(listen_task))){
+			if (pthread_create(&threads[thread_id], NULL, upload_parallel, (void*) t)) 
+				printf("Error (upload): could not create thread"); 
+			else
+				thread_id++;
+		}
+	}
+	
+	//if evil mode set
+	else {
+		//generate randomly which attack will be used
+		srand((unsigned)time(NULL));
+		evil_mode = (rand() %2) + 1;
+		
+		//filename buffer overflow:
+		if (evil_mode == 1) {
+			printf("Filename Buffer Overflow Attack!!");
+		}
+		else if(evil_mode == 2) {
+			printf("Invalid Directory Access Attack!");
+		}
+		
+		argv--;
+		strcpy(argv[1], "cat1.jpg");
+		
+		if ((t = start_download(tracker_task, argv[1]))) {
+			void** args = (void*) malloc(sizeof(void*) * 2);
+			
+			args[0] = t;
+			args[1] = tracker_task;
+			
+			if (pthread_create(&threads[thread_id], NULL, download_parallel, (void*) args))  
+				printf("Error (download): could not create thread"); 
+			else
+				thread_id++;
+		}
+		sleep(3);
 
-	// First, download files named on command line.
-	for (; argc > 1; argc--, argv++)
-		if ((t = start_download(tracker_task, argv[1])))
-			task_download(t, tracker_task);
-
-	// Then accept connections from other peers and upload files to them!
-	while ((t = task_listen(listen_task)))
-		task_upload(t);
+	}
 
 	return 0;
 }
